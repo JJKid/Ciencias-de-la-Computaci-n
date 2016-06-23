@@ -1,0 +1,178 @@
+package mx.unam.ciencias.edd;
+import mx.unam.ciencias.edd.Grafica;
+import mx.unam.ciencias.edd.Lista;
+import java.awt.*;
+import java.io.File;
+
+/**
+ * Clase para imprimir una Gráfica en SVG. 
+ */
+public class GraficaSVG {
+    private Lista<Referencia> referencias = new Lista<>();
+    private Lista<String> listaElementos = new Lista<>();
+    private Lista<File> listaEnlaceElementos = new Lista<>();
+    private Grafica<String> graficaString = new Grafica<>();
+    private String graficaSVG;
+    
+    /**
+     * Crea una GraficaSVG a partir de una lista de elementos recibidos
+     * en la entrada estandar.
+     *
+     * @param elementos: Lista de elementos del cual se creará la gráfica.
+     * @param grafica1   : Gráfica a partir de la cual se creará la gráfica.
+     */
+    public GraficaSVG(Lista<String> listaElementos, Lista<File> listaEnlaceElementos, Grafica<String> graficaString) {
+        this.listaElementos = listaElementos;
+        this.listaEnlaceElementos = listaEnlaceElementos;
+        this.graficaString = graficaString;
+        imprimir();
+    }
+        
+    /**
+     * Dibuja una Gráfica en forma circular con un radio de 500 a partir de una lista de elementos,
+     * a cada uno se le asignará una posición el círculo y se guardará en una lista de referencias.
+     * A partir de la cuál se imprimirán sus conexiones y vértices en formato SVG.
+     */
+    private void imprimir() {
+        int radio = 500;
+        int diametro = radio * 2;
+
+        mapaSVG m = new mapaSVG(diametro + 100, diametro + 100);
+        Point p = new Point((m.getX() / 2), (m.getY() / 2));
+        Referencia centro = new Referencia(p);
+        graficaSVG = m.getMapa();
+        obtenerReferencias(listaElementos, radio, centro);
+        graficaSVG = graficaSVG.concat(imprimeVerticesYConexiones());
+    }
+    
+    /**
+     * Método que dibuja un nodo de una gráfica.
+     *
+     * @param v      : Vertice del cual se imprimira su elemento.
+     * @param x1     : Coordenada x desde la parte izquierda del mapa SVG.
+     * @param y1     : Coordenada y desde la parte superior del mapa SVG.
+     * @param centro : Centro del patron circular donde se dibujaran los nodos.
+     * @param e      : Elemento dentro del nodo.
+     */
+    public String dibujarNodo(int x1, int y1, String e) {
+        String nodo;
+        nodo = "<circle cx='" + x1 + "' cy='" + y1 + "' r='40' stroke=' black' stroke-width='3' fill='black'/>" +
+	    "<text fill='white' font-family='sans-serif' font-size='20' x='" + x1 + "' y='" + y1 + "'\n" +
+	    "             text-anchor='middle'>" + e + "</text>";
+        return nodo;
+    }
+    
+    /**
+     * Método que dibuja una arista a partir de dos nodos vecinos en la gráfica.
+     *
+     * @param x1 : Coordenada x inicial a partir de la cual se comenzará a trazar la arista.
+     * @param y1 : Coordenada y inicial a partir de la cual se comenzará a trazar la arista.
+     * @param x2 : Coordenada x final a partir de la cual se comenzará a trazar la arista.
+     * @param y2 : Coordenada y final a partir de la cual se comenzará a trazar la arista.
+     */
+    public String dibujarArista(int x1, int y1, int x2, int y2) {
+        return "<line x1='" + x1 + "' y1='" + y1 + "' x2='" + x2 + "' y2='" + y2 +
+	    "' stroke='black' stroke-width='3'/>";
+    }
+    
+    /**
+     * Metodo que recorre las referencias de los vértices desplegados de forma circular guardados en una lista de
+     * referencias, para cada uno vuelve a comparar con cada veŕtice en la grafica, verifica si son vecinos en la
+     * gráfica y dibuja una arista que los une.
+     * Cada que une el vértice desplegado en la gráfica con todos sus vecinos, lo marca de color azul, para indicar
+     * que ya fueron dibujadas todas sus conexiones y no repetir aristas en otra iteracion.
+     */
+    public String imprimeVerticesYConexiones() {
+        String aristasYVertices = "";
+        for (Referencia elementoDibujado : referencias) {
+            for (Referencia elementoEnLaGrafica : referencias) {
+                if (graficaString.sonVecinos(elementoDibujado.valor, elementoEnLaGrafica.valor) &&
+		    elementoEnLaGrafica.color == Color.NEGRO) {
+                    aristasYVertices = aristasYVertices.concat(dibujarArista(elementoEnLaGrafica.coordenadas.x,
+									     elementoEnLaGrafica.coordenadas.y, elementoDibujado.coordenadas.x,
+									     elementoDibujado.coordenadas.y));
+                }
+            }
+            elementoDibujado.color = Color.ROJO;
+            for(File archivo : listaEnlaceElementos){
+                if (elementoDibujado.valor.equals(archivo.getName())){
+                    aristasYVertices = aristasYVertices.concat(dibujarNodo(elementoDibujado.coordenadas.x,
+									   elementoDibujado.coordenadas.y, " <a xlink:href=\""+archivo.getAbsolutePath()+"\">\n" +
+									   archivo.getName() +
+									   "    </a>"));
+                }
+            }
+        }
+        return aristasYVertices;
+    }
+
+    /**
+     * Metodo que a partir de los elementos contenidos en listaElementos,
+     * los despliega en forma circular como vértices de una grafica.
+     * Obtiene las posiciones de los vertices, y las guarda en una lista de Referencias.
+     */
+    public void obtenerReferencias(Lista<String> listaElementos, int radio, Referencia centro) {
+        int angulo;
+        int x, y;
+        int i = 0;
+        int segmentos = listaElementos.getLongitud();
+        for (String e : listaElementos) {
+            angulo = (i) * (360 / segmentos);
+            x = (int) (radio * Math.cos(Math.toRadians(angulo)));
+            y = (int) (radio * Math.sin(Math.toRadians(angulo)));
+            int posicionx = centro.coordenadas.x + x;
+            int posiciony = centro.coordenadas.y + y;
+            Point posicion = new Point(posicionx, posiciony);
+            Referencia posicionenCirculo = new Referencia(posicion, e, Color.NEGRO);
+            referencias.agrega(posicionenCirculo);
+            i += 1;
+        }
+    }
+
+    public String getGraficaSVG() {
+        return graficaSVG;
+    }
+
+    /**
+     * Clase privada que generá elementos a los cuales se les puede guardar una objeto Point con valores x y y,
+     * color y un valor, los cuales serán utiles para dibujar vértices y sus conexiones en la gráfica.
+     */
+    private class Referencia {	
+        Point coordenadas;
+        String valor;
+        Color color;
+	
+        /**
+         * Crea un elemento referencia a partir de un Point con valores x y y.
+         *
+         * @param coordenadas: Point con valores x y y.
+         */
+        public Referencia(Point coordenadas) {
+            this.coordenadas = coordenadas;
+        }
+	
+        /**
+         * Crea un elemento Referencia a partir de un Point con valores x y y, y un valor.
+         *
+         * @param coordenadas : Point con valores x y y.
+         * @param valor : Valor del elemento Referencia.
+         */
+        public Referencia(Point coordenadas, String valor) {
+            this.coordenadas = coordenadas;
+            this.valor = valor;
+        }
+	
+        /**
+         * Crea un elemento Referencia a partir de un Point con valores x y y, y un color.
+         *
+         * @param coordenadas : Point con valores x y y.
+         * @param valor : Valor del elemento Referencia.
+         * @param color : Color del elemento Referencia.
+         */
+        public Referencia(Point coordenadas, String valor, Color color) {
+            this.coordenadas = coordenadas;
+            this.valor = valor;
+            this.color = color;
+        }
+    }
+}
